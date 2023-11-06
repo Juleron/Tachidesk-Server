@@ -3,6 +3,9 @@ package eu.kanade.tachiyomi.source.local.metadata
 import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.util.storage.EpubFile
+import kotlinx.serialization.encodeToString
+import nl.adaptivity.xmlutil.serialization.XML
+import java.io.File
 import java.text.ParseException
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -56,5 +59,30 @@ fun EpubFile.fillChapterMetadata(chapter: SChapter) {
         } catch (e: ParseException) {
             // Empty
         }
+    }
+}
+
+fun EpubFile.generateComicInfo(folderPath: String?): File {
+    val ref = getPackageHref()
+    val doc = getPackageDocument(ref)
+
+    val comicInfo =
+        ComicInfo(
+            doc.getElementsByTag("dc:title").first()?.text()?.let { ComicInfo.Title(it) },
+            null, null,
+            doc.getElementsByTag("dc:description").first()?.text()?.let { ComicInfo.Summary(it) },
+            doc.getElementsByTag("dc:creator").first()?.text()?.let { ComicInfo.Writer(it) },
+            null, null, null, null, null, null,
+            doc.getElementsByTag("dc:subject").first()?.text()?.let { ComicInfo.Genre(it) },
+            null, null, null, null,
+        )
+
+    return File("$folderPath/$COMIC_INFO_FILE").apply {
+        writeText(
+            XML {
+                indentString = "    "
+            }.encodeToString(comicInfo),
+            Charsets.UTF_8,
+        )
     }
 }

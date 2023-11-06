@@ -7,6 +7,7 @@ package suwayomi.tachidesk.manga.impl
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import kotlinx.coroutines.runBlocking
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
@@ -94,26 +95,45 @@ object CategoryManga {
             dataClass
         }
 
-        return transaction {
-            // Fetch data from the MangaTable and join with the CategoryMangaTable, if a category is specified
-            val query =
-                if (categoryId == DEFAULT_CATEGORY_ID) {
-                    MangaTable
-                        .leftJoin(ChapterTable, { MangaTable.id }, { ChapterTable.manga })
-                        .leftJoin(CategoryMangaTable)
-                        .slice(columns = selectedColumns)
-                        .select { (MangaTable.inLibrary eq true) and CategoryMangaTable.category.isNull() }
-                } else {
-                    MangaTable
-                        .innerJoin(CategoryMangaTable)
-                        .leftJoin(ChapterTable, { MangaTable.id }, { ChapterTable.manga })
-                        .slice(columns = selectedColumns)
-                        .select { (MangaTable.inLibrary eq true) and (CategoryMangaTable.category eq categoryId) }
-                }
+        val mangaList = ArrayList<MangaDataClass>()
 
-            // Join with the ChapterTable to fetch the last read chapter for each manga
-            query.groupBy(*MangaTable.columns.toTypedArray()).map(transform)
+        if (categoryId == DEFAULT_CATEGORY_ID) {
+            runBlocking {
+                mangaList.addAll(MangaList.getMangaList(0, 1, true).mangaList)
+            }
         }
+
+        val mangaLocalIds = mangaList.map { mangaDataClass -> mangaDataClass.id }.toList()
+
+        val transaction =
+            transaction {
+                // Fetch data from the MangaTable and join with the CategoryMangaTable, if a category is specified
+                val query =
+                    if (categoryId == DEFAULT_CATEGORY_ID) {
+                        MangaTable
+                            .leftJoin(ChapterTable, { MangaTable.id }, { ChapterTable.manga })
+                            .leftJoin(CategoryMangaTable)
+                            .slice(columns = selectedColumns)
+                            .select {
+                                (MangaTable.inLibrary eq true) and CategoryMangaTable.category.isNull() and
+                                    MangaTable.id.notInList(
+                                        mangaLocalIds
+                                    )
+                            }
+                    } else {
+                        MangaTable
+                            .innerJoin(CategoryMangaTable)
+                            .leftJoin(ChapterTable, { MangaTable.id }, { ChapterTable.manga })
+                            .slice(columns = selectedColumns)
+                            .select { (MangaTable.inLibrary eq true) and (CategoryMangaTable.category eq categoryId) }
+                    }
+
+                // Join with the ChapterTable to fetch the last read chapter for each manga
+                query.groupBy(*MangaTable.columns.toTypedArray()).map(transform)
+            }
+
+        mangaList.addAll(transaction)
+        return mangaList
     }
 
     /**

@@ -18,6 +18,7 @@ import eu.kanade.tachiyomi.source.local.metadata.MangaDetails
 import eu.kanade.tachiyomi.source.local.metadata.copyFromComicInfo
 import eu.kanade.tachiyomi.source.local.metadata.fillChapterMetadata
 import eu.kanade.tachiyomi.source.local.metadata.fillMangaMetadata
+import eu.kanade.tachiyomi.source.local.metadata.generateComicInfo
 import eu.kanade.tachiyomi.source.model.FilterList
 import eu.kanade.tachiyomi.source.model.MangasPage
 import eu.kanade.tachiyomi.source.model.Page
@@ -255,6 +256,11 @@ class LocalSource(
                         }
                     }
                 }
+                /*is Format.Epub -> {
+                    EpubFile(chapter).use { epub ->
+                        return epub.generateComicInfo(folderPath)
+                    }
+                }*/
                 else -> {}
             }
         }
